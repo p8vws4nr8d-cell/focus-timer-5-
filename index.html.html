@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>5分集中タイマー</title>
+<style>
+:root{--bg:#f6f1e7;--fg:#2d2a26;--sub:#8a8173;--track:#e4dccb;--ring:#d9573b;--accent:#2f7d6d;--card:#fffaf0;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1e1c19;--fg:#f1ebe0;--sub:#a39a8a;--track:#38342d;--ring:#ef7a5f;--accent:#5fc2ad;--card:#2a2723}}
+:root[data-theme="dark"]{--bg:#1e1c19;--fg:#f1ebe0;--sub:#a39a8a;--track:#38342d;--ring:#ef7a5f;--accent:#5fc2ad;--card:#2a2723}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:"Hiragino Sans","Yu Gothic","Noto Sans JP",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center}
+h1{font-size:2.2rem;margin:0;letter-spacing:.1em}
+.wrap{position:relative;width:min(80vw,300px);aspect-ratio:1}
+svg.ring{width:100%;height:100%;transform:rotate(-90deg)}
+.track{fill:none;stroke:var(--track);stroke-width:12}
+.bar{fill:none;stroke:var(--ring);stroke-width:12;stroke-linecap:round;stroke-dasharray:691.15;stroke-dashoffset:0}
+.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.center svg{width:62%;height:auto}
+.time{font-size:1.6rem;font-variant-numeric:tabular-nums;color:var(--sub);margin-top:-6px}
+.hide{display:none!important}
+.done{flex-direction:column;align-items:center;gap:8px}
+.bubble{background:var(--card);border:3px solid var(--accent);border-radius:20px;padding:12px 22px;font-size:1.7rem;font-weight:700;color:var(--accent);position:relative}
+.bubble::after{content:"";position:absolute;left:50%;bottom:-14px;margin-left:-10px;border:10px solid transparent;border-top-color:var(--accent);border-bottom:0}
+button{margin-top:6px;font:inherit;font-size:1rem;padding:10px 26px;border-radius:99px;border:2px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer}
+.robot{animation:hop 1s ease-in-out infinite}
+@keyframes hop{50%{transform:translateY(-8px)}}
+.zen{animation:breathe 4s ease-in-out infinite;transform-origin:50% 90%}
+@keyframes breathe{50%{transform:scale(1.04)}}
+@media (prefers-reduced-motion:reduce){.robot,.zen{animation:none}}
+</style>
+</head>
+<body>
+<h1 id="title">集中！</h1>
+
+<div id="timerView" class="wrap">
+  <svg class="ring" viewBox="0 0 240 240"><circle class="track" cx="120" cy="120" r="110"/><circle id="bar" class="bar" cx="120" cy="120" r="110"/></svg>
+  <div class="center">
+    <svg class="zen" viewBox="0 0 120 120" aria-label="座禅する人">
+      <circle cx="60" cy="26" r="13" fill="#f2c9a0"/>
+      <path d="M47 24c2-12 24-12 26 0-6-5-20-5-26 0z" fill="#3b2f2a"/>
+      <path d="M40 98c-4-22 6-52 20-52s24 30 20 52z" fill="var(--accent)"/>
+      <ellipse cx="60" cy="100" rx="42" ry="10" fill="#c9a36b"/>
+      <path d="M44 74c10 10 22 10 32 0" stroke="#f2c9a0" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <path d="M54 24h3M64 24h3" stroke="#3b2f2a" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <div class="time" id="time">5:00</div>
+  </div>
+</div>
+
+<div id="doneView" class="done hide">
+  <div class="bubble">頑張ったね！</div>
+  <svg class="robot" width="170" height="190" viewBox="0 0 170 190" aria-label="ロボット">
+    <line x1="85" y1="14" x2="85" y2="34" stroke="var(--sub)" stroke-width="4"/>
+    <circle cx="85" cy="12" r="7" fill="var(--ring)"/>
+    <rect x="40" y="34" width="90" height="70" rx="20" fill="#9fb8c9"/>
+    <circle cx="65" cy="62" r="9" fill="#fff"/><circle cx="105" cy="62" r="9" fill="#fff"/>
+    <circle cx="65" cy="62" r="4" fill="#222"/><circle cx="105" cy="62" r="4" fill="#222"/>
+    <path d="M65 84q20 14 40 0" stroke="#222" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <rect x="52" y="108" width="66" height="58" rx="14" fill="#7a9bb3"/>
+    <circle cx="85" cy="137" r="8" fill="var(--ring)"/>
+    <path d="M52 120L24 92M118 120L146 92" stroke="#7a9bb3" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="22" cy="90" r="9" fill="#9fb8c9"/><circle cx="148" cy="90" r="9" fill="#9fb8c9"/>
+    <rect x="60" y="166" width="16" height="18" rx="5" fill="#5f7f96"/><rect x="94" y="166" width="16" height="18" rx="5" fill="#5f7f96"/>
+  </svg>
+  <button id="again">もう一度</button>
+</div>
+
+<script>
+var TOTAL = 5 * 60 * 1000, C = 691.15, end, timer;
+var bar = document.getElementById("bar"), timeEl = document.getElementById("time");
+function show(done){
+  document.getElementById("timerView").classList.toggle("hide", done);
+  document.getElementById("doneView").classList.toggle("hide", !done);
+  document.getElementById("title").textContent = done ? "お疲れさま！" : "集中！";
+}
+function tick(){
+  var left = Math.max(0, end - Date.now());
+  bar.style.strokeDashoffset = C * (1 - left / TOTAL);
+  var s = Math.ceil(left / 1000);
+  timeEl.textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  if (left <= 0) { clearInterval(timer); finish(); }
+}
+function finish(){
+  show(true);
+  try {
+    var ac = new (window.AudioContext || window.webkitAudioContext)();
+    [660, 880, 1100].forEach(function(f, i){
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = f; o.connect(g); g.connect(ac.destination);
+      var t = ac.currentTime + i * 0.18;
+      g.gain.setValueAtTime(0.15, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+      o.start(t); o.stop(t + 0.4);
+    });
+  } catch (e) {}
+  try {
+    var u = new SpeechSynthesisUtterance("頑張ったね！");
+    u.lang = "ja-JP"; u.pitch = 1.6; u.rate = 1.0;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+function start(){
+  show(false);
+  end = Date.now() + TOTAL;
+  tick();
+  timer = setInterval(tick, 250);
+}
+document.getElementById("again").onclick = start;
+start();
+</script>
+</body>
+</html>
